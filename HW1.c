@@ -4,6 +4,25 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
+void process_escapes(char *s) {
+    char *read = s;
+    char *write = s;
+    while (*read) {
+        if (*read == '\\' && *(read + 1) != '\0') {
+            read++;
+            if (*read == ' ') {
+                *write++ = 0x01;
+            } else {
+                *write++ = *read;
+            }
+            read++;
+        } else {
+            *write++ = *read++;
+        }
+    }
+    *write = '\0';
+}
+
 char ***parse(const char *line) {
     char *copy = strdup(line);
     char ***cmds = malloc(sizeof(char**) * 16);
@@ -13,6 +32,8 @@ char ***parse(const char *line) {
     char *cmd_str = strtok_r(copy, "|", &save1);
 
     while (cmd_str != NULL && ci < 16 - 1) {
+        process_escapes(cmd_str);
+
         char **argv = malloc(sizeof(char*) * 32);
         int ai = 0;
 
@@ -22,6 +43,14 @@ char ***parse(const char *line) {
             word = strtok_r(NULL, " \t\n", &save2);
         }
         argv[ai] = NULL;
+
+        int i;
+        for (i = 0; i < ai; i++) {
+            char *p;
+            for (p = argv[i]; *p; p++) {
+                if (*p == 0x01) *p = ' ';
+            }
+        }
 
         if (ai > 0) cmds[ci++] = argv;
         cmd_str = strtok_r(NULL, "|", &save1);
